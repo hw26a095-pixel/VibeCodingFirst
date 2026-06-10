@@ -1,0 +1,6 @@
+{
+  "name": "ホードサバイバル (Action Survival Game)",
+  "description": "大量の敵をなぎ倒す、爽快なトップダウン・アクションサバイバルゲーム。異なる武器、レベルアップ強化、ボス戦、迫力のエフェクトを楽しめます。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
