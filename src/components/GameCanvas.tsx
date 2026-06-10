@@ -137,6 +137,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   // Orbiting rings shield angle
   const shieldAngleRef = useRef<number>(0);
 
+  // Boss defeat scaling properties
+  const bossDefeatedRef = useRef<boolean>(false);
+  const bossDefeatedTimeRef = useRef<number>(0);
+
   // Entities lists (mutable refs for the game frame rate performance)
   const enemiesRef = useRef<Enemy[]>([]);
   const bulletsRef = useRef<Bullet[]>([]);
@@ -342,6 +346,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       if (enemy.type === 'BOSS') {
         dropType = 'SHIELD'; // Drops powerful bubble or chest
+        bossDefeatedRef.current = true;
+        bossDefeatedTimeRef.current = gameTimeRef.current;
+        
+        // Show epic announcement popup that hostiles are growing stronger!
+        popupsRef.current.push({
+          id: Math.random().toString(),
+          x: playerPosRef.current.x,
+          y: playerPosRef.current.y - 60,
+          text: '★ 災厄を打倒！暗黒の余波で敵の最大体力が急増中！ (+6%/秒) ★',
+          color: '#ec4899',
+          isCrit: true,
+          alpha: 1,
+          life: 0
+        });
       } else if (enemy.type === 'CHAMPION') {
         dropType = 'GEM_L';
       } else if (rollHex < 0.04) {
@@ -455,6 +473,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         break;
     }
 
+    // Scale enemy HP over time if the boss has been defeated
+    if (bossDefeatedRef.current) {
+      const secondsSinceBossDefeat = Math.max(0, gameTimeRef.current - bossDefeatedTimeRef.current);
+      const scaleMultiplier = 1.0 + (secondsSinceBossDefeat * 0.08);
+      hp = Math.round(hp * scaleMultiplier);
+    }
+
     // Spawn adjustment
     enemiesRef.current.push({
       id: Math.random().toString(),
@@ -486,8 +511,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       x: bx,
       y: by,
       radius: 45,
-      hp: 1200 + num * 600,
-      maxHp: 1200 + num * 600,
+      hp: 8000 + num * 3000,
+      maxHp: 8000 + num * 3000,
       speed: 0.7,
       damage: 32,
       scoreValue: 1200,
@@ -983,30 +1008,57 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       swordSweepActiveRef.current = 14;
       swordSweepDirRef.current = pos.angle;
       swordSweepSideRef.current *= -1; // Toggle side swings back-and-forth
-
+ 
       gameAudio.playSlash();
+ 
+      // Calculate all sweep angles based on projectileCount (Extra Slashes / Multi-Slashes)
+      const sweepAngles: number[] = [pos.angle];
+      if (stats.projectileCount > 0) {
+        for (let j = 1; j <= stats.projectileCount; j++) {
+          if (j === 1) {
+            // Opposite direction (sweep behind the Knight)
+            sweepAngles.push(pos.angle + Math.PI);
+          } else if (j === 2) {
+            // Sweep to the right side
+            sweepAngles.push(pos.angle + Math.PI / 2);
+          } else if (j === 3) {
+            // Sweep to the left side
+            sweepAngles.push(pos.angle - Math.PI / 2);
+          } else {
+            sweepAngles.push(pos.angle + (j * Math.PI) / 3);
+          }
+        }
+      }
 
       // Swing Sweep Attack Detection - Buffed Knight Range & Sweep Arc for massive groups!
       const sweepRange = 155; // Long range reach (was 115)
       const sweepArc = Math.PI * 1.25; // 225 degree massive sweeping semi-circle (was 160)
-
+ 
       for (let i = enemiesRef.current.length - 1; i >= 0; i--) {
         const enemy = enemiesRef.current[i];
         if (enemy.hp <= 0) continue;
         const edx = enemy.x - pos.x;
         const edy = enemy.y - pos.y;
         const edist = Math.sqrt(edx * edx + edy * edy);
-
+ 
         if (edist <= sweepRange) {
           // Check if enemy lies within sweep angle limits
           let angleToEnemy = Math.atan2(edy, edx);
-          let angleDiff = angleToEnemy - pos.angle;
           
-          // Normalize angle difference to limits [-PI, PI]
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-          if (Math.abs(angleDiff) <= sweepArc / 2) {
+          let hitByAnySweep = false;
+          for (const sAngle of sweepAngles) {
+            let angleDiff = angleToEnemy - sAngle;
+            // Normalize angle difference to limits [-PI, PI]
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+ 
+            if (Math.abs(angleDiff) <= sweepArc / 2) {
+              hitByAnySweep = true;
+              break;
+            }
+          }
+ 
+          if (hitByAnySweep) {
             // Sword sweep! Knocks enemy backward in angle with solid feedback
             const kbForce = 16.0; // Strong knockback (was 12)
             const kbX = Math.cos(angleToEnemy) * kbForce;
@@ -1374,12 +1426,37 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
         ctx.restore();
       } else {
-        ctx.fillStyle = b.color;
-        ctx.shadowColor = b.color;
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        ctx.fill();
+        if (b.isSwordWave) {
+          ctx.save();
+          // Draw a beautiful glowing crescent blade of light
+          ctx.translate(b.x, b.y);
+          ctx.rotate(Math.atan2(b.dy, b.dx));
+          ctx.fillStyle = b.color;
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 8;
+          
+          ctx.beginPath();
+          ctx.arc(0, 0, b.radius * 1.8, -Math.PI / 2.8, Math.PI / 2.8);
+          // inner curving contour back to starting-point
+          ctx.arc(b.radius * 0.6, 0, b.radius * 1.3, Math.PI / 3, -Math.PI / 3, true);
+          ctx.closePath();
+          ctx.fill();
+          
+          // Glow blade edge in white hot intensity
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.shadowBlur = 0;
+          ctx.stroke();
+          
+          ctx.restore();
+        } else {
+          ctx.fillStyle = b.color;
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     });
     ctx.shadowBlur = 0;
@@ -1563,31 +1640,49 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Draw active Sword Sweep visual overlay in absolute space
     if (stats.weapon === 'SWORD' && swordSweepActiveRef.current > 0) {
-      ctx.save();
-      ctx.translate(pPos.x, pPos.y);
-      ctx.rotate(swordSweepDirRef.current);
+      // Calculate all active sweep angles
+      const sweepAngles: number[] = [swordSweepDirRef.current];
+      if (stats.projectileCount > 0) {
+        for (let j = 1; j <= stats.projectileCount; j++) {
+          if (j === 1) {
+            sweepAngles.push(swordSweepDirRef.current + Math.PI);
+          } else if (j === 2) {
+            sweepAngles.push(swordSweepDirRef.current + Math.PI / 2);
+          } else if (j === 3) {
+            sweepAngles.push(swordSweepDirRef.current - Math.PI / 2);
+          } else {
+            sweepAngles.push(swordSweepDirRef.current + (j * Math.PI) / 3);
+          }
+        }
+      }
 
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
-      ctx.lineWidth = 14;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      
-      const sweepDirection = swordSweepSideRef.current;
-      const progress = (14 - swordSweepActiveRef.current) / 14;
-      const swingStart = -Math.PI * 0.4 * sweepDirection;
-      const swingEnd = Math.PI * 0.4 * sweepDirection * progress;
+      sweepAngles.forEach(angle => {
+        ctx.save();
+        ctx.translate(pPos.x, pPos.y);
+        ctx.rotate(angle);
 
-      ctx.arc(0, 0, 80, swingStart, swingStart + swingEnd, sweepDirection < 0);
-      ctx.stroke();
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+        ctx.lineWidth = 14;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        
+        const sweepDirection = swordSweepSideRef.current;
+        const progress = (14 - swordSweepActiveRef.current) / 14;
+        const swingStart = -Math.PI * 0.4 * sweepDirection;
+        const swingEnd = Math.PI * 0.4 * sweepDirection * progress;
 
-      // Sharp glowing white edge
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, 80, swingStart + swingEnd * 0.8, swingStart + swingEnd * 1.05, sweepDirection < 0);
-      ctx.stroke();
+        ctx.arc(0, 0, 80, swingStart, swingStart + swingEnd, sweepDirection < 0);
+        ctx.stroke();
 
-      ctx.restore();
+        // Sharp glowing white edge
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, 80, swingStart + swingEnd * 0.8, swingStart + swingEnd * 1.05, sweepDirection < 0);
+        ctx.stroke();
+
+        ctx.restore();
+      });
     }
 
     // Orbiting Shield shields
@@ -1643,6 +1738,75 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     });
 
     ctx.restore(); // restore camera transformation context
+
+    // ==========================================
+    // DRAW SCREEN-SPACE HUD (Outside camera transformation)
+    // ==========================================
+    const activeBoss = enemiesRef.current.find(e => e.type === 'BOSS' && e.hp > 0);
+    if (activeBoss) {
+      // Draw elegant giant Boss HP Bar at the top of the viewport
+      const barW = Math.min(vW * 0.7, 500);
+      const barH = 14;
+      const barX = (vW - barW) / 2;
+      const barY = 28;
+
+      ctx.save();
+      
+      // Outer neon shadow/glow effect for a high-threat boss climate
+      ctx.shadowColor = '#f43f5e';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = 'rgba(9, 9, 11, 0.90)';
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 2;
+      
+      // Draw solid outline backdrop container
+      ctx.beginPath();
+      ctx.rect(barX - 4, barY - 4, barW + 8, barH + 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0; // Turn off shadows for internal segments
+
+      // Empty inner bar background
+      ctx.fillStyle = '#1e1b4b'; // Deep twilight violet/indigo
+      ctx.beginPath();
+      ctx.rect(barX, barY, barW, barH);
+      ctx.fill();
+
+      // HP Filled bar ratio
+      const hpPercent = Math.max(0, activeBoss.hp / activeBoss.maxHp);
+      if (hpPercent > 0) {
+        // Linear gradient for a burning/fire boss look
+        const grad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+        grad.addColorStop(0, '#ef4444'); // Fiery deep red
+        grad.addColorStop(0.5, '#f43f5e'); // Rose pink
+        grad.addColorStop(1, '#ec4899'); // Glowing hot fuchsia
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.rect(barX, barY, barW * hpPercent, barH);
+        ctx.fill();
+
+        // High intensity gloss sheen highlight on the top half
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.fillRect(barX, barY, barW * hpPercent, barH / 2);
+      }
+
+      // Draw epic Boss Name tag above the healthbar
+      ctx.fillStyle = '#fecdd3'; // Delicate soft light rose text
+      ctx.font = '900 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('★★★ 終ノ日 災厄の核 (BOSS STATUS) ★★★', vW / 2, barY - 8);
+
+      // Draw precise HP stats figures inside the healthbar
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${Math.round(activeBoss.hp)} / ${activeBoss.maxHp} (${Math.round(hpPercent * 100)}%)`, vW / 2, barY + barH / 2 + 1);
+
+      ctx.restore();
+    }
   };
 
   return (
@@ -1663,9 +1827,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       {/* In-Game HUD overlay panel */}
       <div className="absolute top-4 left-4 z-20 pointer-events-none w-[200px] select-none bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 backdrop-blur-md">
         <div className="text-xs font-mono text-zinc-500 mb-1">CURRENT WAVE</div>
-        <div className="text-lg font-sans font-black text-amber-400 capitalize mb-2">
+        <div className="text-lg font-sans font-black text-amber-400 capitalize mb-1">
           {WAVE_CONFIGS[waveNum - 1]?.japaneseName || '最終ウェーブ'}
         </div>
+
+        {bossDefeatedRef.current && (
+          <div className="text-[10px] font-mono text-rose-400 font-bold animate-pulse mb-2 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+            敵HP持続強化: +{Math.round(Math.max(0, gameTime - bossDefeatedTimeRef.current) * 8)}%
+          </div>
+        )}
 
         {/* Lifebar panel */}
         <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 mb-1">

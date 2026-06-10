@@ -98,6 +98,15 @@ export const UPGRADES_LIST: Upgrade[] = [
     japaneseDescription: '（弓・魔杖）攻撃時に追加の発射物を +1 同時発射します。',
     icon: 'Sparkles',
     onApply: (stats) => ({ ...stats, projectileCount: stats.projectileCount + 1 }),
+  },
+  {
+    id: 'extra_slashes',
+    name: 'Multi-Directional Slash',
+    japaneseName: '多角連撃の術',
+    description: 'Triggers +1 additional deep physical sword sweep in other directions!',
+    japaneseDescription: '剣で攻撃時、死角をカバーする周囲への追加の大振りの斬撃（+1回）を同時に放ちます。',
+    icon: 'Sword',
+    onApply: (stats) => ({ ...stats, projectileCount: stats.projectileCount + 1 }),
   }
 ];
 
@@ -112,6 +121,8 @@ export const UpgradeScreen: React.FC<UpgradeScreenProps> = ({ playerStats, onSel
     let finalPool = filtered;
     if (playerStats.weapon === 'SWORD') {
       finalPool = filtered.filter(u => u.id !== 'extra_proj');
+    } else {
+      finalPool = filtered.filter(u => u.id !== 'extra_slashes');
     }
 
     const shuffled = [...finalPool].sort(() => 0.5 - Math.random());

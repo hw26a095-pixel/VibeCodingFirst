@@ -64,6 +64,7 @@ export interface Bullet {
   maxDistance: number;
   distanceTraveled: number;
   isPierce?: boolean;
+  isSwordWave?: boolean;
 }
 
 export interface Particle {
