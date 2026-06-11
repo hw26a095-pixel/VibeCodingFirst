@@ -149,26 +149,26 @@ export const UpgradeScreen: React.FC<UpgradeScreenProps> = ({ playerStats, onSel
   };
 
   return (
-    <div id="upgrade-overlay" className="absolute inset-0 z-40 bg-black/80 flex flex-col justify-center items-center p-6 backdrop-blur-md">
+    <div id="upgrade-overlay" className="absolute inset-0 z-40 bg-black/85 flex flex-col justify-center items-center p-4 sm:p-6 backdrop-blur-md overflow-y-auto">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="w-full max-w-4xl text-center flex flex-col items-center select-none"
+        className="w-full max-w-4xl text-center flex flex-col items-center select-none my-auto py-2"
       >
-        <span className="text-amber-400 font-mono tracking-widest text-lg font-bold bg-amber-950/40 border border-amber-800/40 px-4 py-1.5 rounded-full mb-3 uppercase animate-pulse">
+        <span className="text-amber-500 font-mono tracking-widest text-xs sm:text-sm md:text-lg font-bold bg-amber-950/40 border border-amber-800/40 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full mb-2 sm:mb-3 uppercase animate-pulse">
           LEVEL UP! / レベルアップ!
         </span>
-        <h2 className="text-3xl sm:text-4xl font-sans font-black text-white mb-2 tracking-tight">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-sans font-black text-white mb-1 sm:mb-2 tracking-tight">
           Select Your Upgrade
         </h2>
-        <p className="text-gray-400 text-sm max-w-md mx-auto mb-10 font-sans">
-          Choose a path to bolster your defenses and damage. Enemies are growing stronger!
-          <br />
+        <p className="text-gray-400 text-xs sm:text-sm max-w-md mx-auto mb-5 sm:mb-8 md:mb-10 font-sans px-2">
+          Choose a path to bolster your defenses. Enemies are growing stronger!
+          <br className="hidden sm:block" />
           能力を強化して生き残りましょう。
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6 w-full max-w-3xl px-2">
           {choices.map((upgrade, idx) => (
             <motion.div
               key={upgrade.id}
@@ -176,42 +176,45 @@ export const UpgradeScreen: React.FC<UpgradeScreenProps> = ({ playerStats, onSel
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: idx * 0.1, type: "spring", stiffness: 100 }}
               onClick={() => selectUpgrade(upgrade)}
-              className="group cursor-pointer relative bg-zinc-900 border border-zinc-800 hover:border-amber-500/80 p-6 rounded-2xl flex flex-col items-center text-center transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/10 active:scale-95"
+              className="group cursor-pointer relative bg-zinc-900 border border-zinc-800 hover:border-amber-500/80 p-4 sm:p-6 rounded-xl sm:rounded-2xl flex md:flex-col items-center text-left md:text-center transition-all duration-300 transform md:hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/10 active:scale-98 touch-manipulation"
             >
               {/* Card visual highlight */}
-              <div className="absolute inset-0 bg-gradient-to-b from-amber-500/0 via-amber-500/0 to-amber-500/5 opacity-0 group-hover:opacity-100 rounded-2xl transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-b from-amber-500/0 via-amber-500/0 to-amber-500/5 opacity-0 group-hover:opacity-100 rounded-xl sm:rounded-2xl transition-opacity duration-300" />
               
               {/* Icon Container */}
-              <div className="w-16 h-16 rounded-xl bg-zinc-950 flex items-center justify-center mb-5 border border-zinc-800 group-hover:border-amber-500/40 group-hover:bg-zinc-900 duration-300">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg md:rounded-xl bg-zinc-950 flex flex-shrink-0 items-center justify-center mr-4 md:mr-0 md:mb-5 border border-zinc-800 group-hover:border-amber-500/40 group-hover:bg-zinc-900 duration-300">
                 {getIcon(upgrade.icon)}
               </div>
 
-              {/* Japanese Title */}
-              <h4 className="text-xs font-mono text-amber-500 tracking-wider font-bold mb-1">
-                {upgrade.japaneseName}
-              </h4>
+              {/* Text Container */}
+              <div className="flex-1 min-w-0 md:flex flex-col md:items-center">
+                {/* Japanese Title */}
+                <h4 className="text-[10px] sm:text-xs font-mono text-amber-500 tracking-wider font-bold mb-0.5">
+                  {upgrade.japaneseName}
+                </h4>
 
-              {/* Name */}
-              <h3 className="text-lg font-sans font-black text-white mb-3 group-hover:text-amber-400 transition-colors">
-                {upgrade.name}
-              </h3>
+                {/* Name */}
+                <h3 className="text-sm sm:text-base md:text-lg font-sans font-black text-white mb-1 md:mb-3 group-hover:text-amber-400 transition-colors">
+                  {upgrade.name}
+                </h3>
 
-              {/* Divider */}
-              <div className="w-12 h-px bg-zinc-800 group-hover:bg-amber-500/30 mb-4 transition-colors" />
+                {/* Divider */}
+                <div className="hidden md:block w-12 h-px bg-zinc-800 group-hover:bg-amber-500/30 mb-4 transition-colors" />
 
-              {/* Descriptions */}
-              <p className="text-xs text-zinc-300 leading-relaxed min-h-[40px] font-sans">
-                {upgrade.japaneseDescription}
-              </p>
-              <p className="text-[10px] text-zinc-500 leading-relaxed font-mono mt-2">
-                {upgrade.description}
-              </p>
+                {/* Descriptions */}
+                <p className="text-xs text-zinc-300 leading-normal md:leading-relaxed font-sans">
+                  {upgrade.japaneseDescription}
+                </p>
+                <p className="text-[10px] text-zinc-500 leading-normal md:leading-relaxed font-mono mt-0.5 md:mt-2">
+                  {upgrade.description}
+                </p>
+              </div>
             </motion.div>
           ))}
         </div>
 
         {/* Level footer stats */}
-        <div className="mt-12 flex flex-wrap gap-x-6 gap-y-2 text-zinc-500 font-mono text-xs border-t border-zinc-800/80 pt-6 justify-center max-w-lg">
+        <div className="mt-6 md:mt-12 flex flex-wrap gap-x-4 gap-y-1 text-zinc-500 font-mono text-[10px] sm:text-xs border-t border-zinc-800/80 pt-4 md:pt-6 justify-center w-full max-w-lg">
           <div>WEAPON: <span className="text-zinc-300 font-sans font-bold">{playerStats.weapon}</span></div>
           <div>LEVEL: <span className="text-zinc-300 font-sans font-bold">{playerStats.level}</span></div>
           <div>DAMAGE: <span className="text-zinc-300 font-sans font-bold">{playerStats.damage}</span></div>

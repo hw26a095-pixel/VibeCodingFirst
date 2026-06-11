@@ -261,22 +261,55 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   };
 
-  // Tracking mouse on canvas
+  // Tracking mouse on canvas with scale awareness
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const canvasMouseX = e.clientX - rect.left;
     const canvasMouseY = e.clientY - rect.top;
 
-    // Convert canvas coordinates back into Arena absolute space based on Camera offset centering player
     const viewPortW = viewportSizeRef.current.w;
     const viewPortH = viewportSizeRef.current.h;
-    const camX = playerPosRef.current.x - viewPortW / 2;
-    const camY = playerPosRef.current.y - viewPortH / 2;
+
+    // Support smartphone view scaling
+    const isMobile = viewPortW < 640 || viewPortH < 640;
+    const scale = isMobile ? 0.7 : 1.0;
+
+    const screenOffsetX = canvasMouseX - viewPortW / 2;
+    const screenOffsetY = canvasMouseY - viewPortH / 2;
+
+    const mapOffsetX = screenOffsetX / scale;
+    const mapOffsetY = screenOffsetY / scale;
 
     mouseRef.current = {
-      x: canvasMouseX + camX,
-      y: canvasMouseY + camY
+      x: playerPosRef.current.x + mapOffsetX,
+      y: playerPosRef.current.y + mapOffsetY
+    };
+  };
+
+  // Support manual touch aiming on mobile/smartphones
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || e.touches.length === 0) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const touch = e.touches[0];
+    const canvasMouseX = touch.clientX - rect.left;
+    const canvasMouseY = touch.clientY - rect.top;
+
+    const viewPortW = viewportSizeRef.current.w;
+    const viewPortH = viewportSizeRef.current.h;
+
+    const isMobile = viewPortW < 640 || viewPortH < 640;
+    const scale = isMobile ? 0.7 : 1.0;
+
+    const screenOffsetX = canvasMouseX - viewPortW / 2;
+    const screenOffsetY = canvasMouseY - viewPortH / 2;
+
+    const mapOffsetX = screenOffsetX / scale;
+    const mapOffsetY = screenOffsetY / scale;
+
+    mouseRef.current = {
+      x: playerPosRef.current.x + mapOffsetX,
+      y: playerPosRef.current.y + mapOffsetY
     };
   };
 
@@ -957,7 +990,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       if (loot.isAttracted) {
         // Accelerate item towards Player
-        const pullSpeed = 4.8;
+        const pullSpeed = 9.6;
         loot.x += (ldx / ldist) * pullSpeed;
         loot.y += (ldy / ldist) * pullSpeed;
       }
@@ -1247,7 +1280,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Player taking damage
   const damagePlayer = (dmg: number) => {
-    const roundedDmg = Math.round(dmg);
+    let finalDmg = dmg;
+    if (pStatsRef.current.weapon === 'SWORD') {
+      finalDmg = dmg * 0.5;
+    }
+    const roundedDmg = Math.round(finalDmg);
     // If shield orbits exist, absorb hit instead of full damage!
     if (pStatsRef.current.shieldCount > 0) {
       gameAudio.playHitPlayer();
@@ -1310,13 +1347,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ctx.fillStyle = '#09090b';
     ctx.fillRect(0, 0, vW, vH);
 
-    // Camera offset translation so player stays centered
+    // Support smartphone view scaling: Expand visible range on mobile screens
+    const isMobile = vW < 640 || vH < 640;
+    const scale = isMobile ? 0.7 : 1.0;
+
     const pPos = playerPosRef.current;
-    const camX = pPos.x - vW / 2;
-    const camY = pPos.y - vH / 2;
+
+    // Calculate boundary limits of visible game world based on scale
+    const halfW = (vW / 2) / scale;
+    const halfH = (vH / 2) / scale;
+    const left = pPos.x - halfW;
+    const right = pPos.x + halfW;
+    const top = pPos.y - halfH;
+    const bottom = pPos.y + halfH;
 
     ctx.save();
-    ctx.translate(-camX, -camY);
+    // Center viewport, scale, then translate back relative to player
+    ctx.translate(vW / 2, vH / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-pPos.x, -pPos.y);
 
     // ==========================================
     // DRAW ARENA BACKGROUND
@@ -1327,21 +1376,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ctx.lineWidth = 1;
 
     // Bound grid loop to MAP boundaries
-    const startGridX = Math.floor(Math.max(0, camX) / gridSize) * gridSize;
-    const endGridX = Math.ceil(Math.min(MAP_SIZE, camX + vW) / gridSize) * gridSize;
-    const startGridY = Math.floor(Math.max(0, camY) / gridSize) * gridSize;
-    const endGridY = Math.ceil(Math.min(MAP_SIZE, camY + vH) / gridSize) * gridSize;
+    const startGridX = Math.floor(Math.max(0, left) / gridSize) * gridSize;
+    const endGridX = Math.ceil(Math.min(MAP_SIZE, right) / gridSize) * gridSize;
+    const startGridY = Math.floor(Math.max(0, top) / gridSize) * gridSize;
+    const endGridY = Math.ceil(Math.min(MAP_SIZE, bottom) / gridSize) * gridSize;
 
     for (let gx = startGridX; gx <= endGridX; gx += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(gx, Math.max(0, camY));
-      ctx.lineTo(gx, Math.min(MAP_SIZE, camY + vH));
+      ctx.moveTo(gx, Math.max(0, top));
+      ctx.lineTo(gx, Math.min(MAP_SIZE, bottom));
       ctx.stroke();
     }
     for (let gy = startGridY; gy <= endGridY; gy += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(Math.max(0, camX), gy);
-      ctx.lineTo(Math.min(MAP_SIZE, camX + vW), gy);
+      ctx.moveTo(Math.max(0, left), gy);
+      ctx.lineTo(Math.min(MAP_SIZE, right), gy);
       ctx.stroke();
     }
 
@@ -1816,6 +1865,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       <canvas 
         ref={canvasRef}
         onMouseMove={handleMouseMove}
+        onTouchStart={handleTouchMove}
+        onTouchMove={handleTouchMove}
         className="block w-full h-full"
       />
 
